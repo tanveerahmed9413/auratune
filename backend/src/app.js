@@ -8,9 +8,20 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
+const allowedOrigins = [
+    "http://localhost:5173",
+    "https://auratune-vqd1.onrender.com",
+];
+
 app.use(
     cors({
-        origin: "https://auratune-vqd1.onrender.com",
+        origin: function (origin, callback) {
+            if (!origin || allowedOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error("Not allowed by CORS"));
+            }
+        },
         credentials: true,
     })
 );
@@ -27,7 +38,7 @@ const publicPath = path.join(__dirname, "../public/dist");
 
 app.use(express.static(publicPath));
 
-// React Router fallback — Express 5
+// React Router fallback
 app.get("/{*splat}", (req, res) => {
     res.sendFile(path.join(publicPath, "index.html"));
 });
