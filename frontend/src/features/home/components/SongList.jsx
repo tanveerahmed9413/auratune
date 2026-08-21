@@ -11,7 +11,7 @@ const SongList = () => {
     playSong,
     selectedMood,
     handleMoodFilter,
-    searchResult,
+    searchResults,
     searchQuery,
   } = useHome();
 
@@ -21,7 +21,7 @@ const SongList = () => {
 
   // Search active hai to searchResult,
   // otherwise normal songs
-  const displaySongs = searchQuery.trim() ? searchResult : songs;
+  const displaySongs = searchQuery.trim() ? searchResults : songs;
 
   if (loading) {
     return (
