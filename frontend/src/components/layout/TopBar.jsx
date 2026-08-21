@@ -1,5 +1,5 @@
 import { Search, ScanFace, X, TableOfContents } from "lucide-react";
-import { useState } from "react";
+import { useState,useEffect } from "react";
 import SongUploadCard from "../../features/home/components/SongUploadCard";
 import FaceExpression from "../../features/expression/components/FaceExpression";
 import MobileSidebar from "./MobileSidebar";
@@ -9,8 +9,18 @@ const TopBar = () => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showMoodModal, setShowMoodModal] = useState(false);
   const [mobileSidebar, setMobileSidebar] = useState(false);
+  const [searchQuery,setSearchQuery] = useState("")
 
-  const { handleGetSongsByMood } = useHome();
+  const { handleGetSongsByMood, handleSearchSongs } = useHome();
+
+// search debauncing 
+  useEffect(() => {
+  const timer = setTimeout(() => {
+    handleSearchSongs(searchQuery);
+  }, 400);
+
+  return () => clearTimeout(timer);
+}, [searchQuery]);
 
   const handleOpenUploadModal = () => {
     setMobileSidebar(false);
@@ -53,7 +63,9 @@ const TopBar = () => {
 
           <input
             type="text"
+            value={searchQuery}
             placeholder="Search songs, artists, albums..."
+            onChange={(e) => handleSearchSongs(e.target.value)}
             className="w-full h-[52px] pl-12 pr-4 rounded-xl bg-[#0d121c] border border-white/[0.08] text-sm text-white placeholder:text-gray-500 outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/10 transition"
           />
         </div>

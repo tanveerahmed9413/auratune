@@ -1,7 +1,7 @@
 import { useContext, useState } from "react";
 
 import { HomeContext } from "../home.context";
-import { getAllSongs, songUpload, getSongsByMood } from "../services/home.api";
+import { getAllSongs, songUpload, getSongsByMood ,songSearch } from "../services/home.api";
 import {
   dismissToast,
   showError,
@@ -13,6 +13,7 @@ export const useHome = () => {
   const context = useContext(HomeContext);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [moodLoading, setMoodLoading] = useState(false);
+  const [searchLoading,setSearchLoading] = useState(false)
 
   if (!context) {
     throw new Error("useHome must be used inside HomeProvider");
@@ -39,6 +40,12 @@ export const useHome = () => {
 
     selectedMood,
     setSelectedMood,
+    
+    searchResult,
+    setSearchResults,
+
+    searchQuery,
+    setSearchQuery
   } = context;
 
   // GET ALL SONGS
@@ -103,6 +110,28 @@ export const useHome = () => {
       setUploadLoading(false);
     }
   };
+
+  const handleSearchSongs = async (query) => {
+  setSearchQuery(query);
+
+  if (!query.trim()) {
+    setSearchResults([]);
+    return;
+  }
+
+  try {
+    setSearchLoading(true);
+
+    const songs = await songSearch(query);
+
+    setSearchResults(songs);
+  } catch (error) {
+    console.error("Search failed:", error);
+    setSearchResults([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const playSong = (song, index) => {
     setCurrentSong(song);
@@ -176,5 +205,10 @@ export const useHome = () => {
 
     handleMoodFilter,
     selectedMood,
+
+    handleSearchSongs,
+    searchLoading,
+    searchResult,
+    searchQuery
   };
 };

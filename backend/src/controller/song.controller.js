@@ -17,14 +17,11 @@ async function uploadSong(req, res) {
 
     const tags = id3.read(songBuffer);
 
-
     // =========================
     // RECCOBEATS ANALYSIS
     // =========================
 
     const analysis = await analyzeAudio(req.file.buffer, req.file.originalname);
-
-
 
     if (!tags?.title) {
       return res.status(400).json({
@@ -97,4 +94,50 @@ async function getSongsByMood(req, res) {
   });
 }
 
-module.exports = { uploadSong, getSongs, getSongsByMood };
+async function searchSong(req, res) {
+  try {
+    const { q } = req.query;
+
+    if (!q || !q.trim()) {
+      return res.status(200).json({
+        success: true,
+        songs: [],
+      });
+    }
+
+    const searchQuery = q.trim();
+
+    const songs = await songModel
+      .find({
+        $or: [
+          {
+            title: {
+              $regex: searchQuery,
+              $optiion: "i",
+            },
+          },
+          {
+            mood: {
+              $regex: searchQuery,
+              $options: "i",
+            },
+          },
+        ],
+      })
+      .limit(20);
+
+    return res.status(200).json({
+      success: true,
+      songs,
+    });
+  } catch (err) {
+    console.error("SEARCH SONG ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to search songs",
+    });
+  }
+}
+
+module.exports = { uploadSong, getSongs, getSongsByMood, searchSong };

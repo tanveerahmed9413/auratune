@@ -5,13 +5,13 @@ export const HomeContext = createContext();
 export const HomeProvider = ({ children }) => {
   const [songs, setSongs] = useState([]);
   const [loading, setLoading] = useState(false);
-   const [uploadedSong, setUploadedSong] = useState(null);
+  const [uploadedSong, setUploadedSong] = useState(null);
   const [currentSong, setCurrentSong] = useState();
   const [currentIndex, setCurrentIndex] = useState();
-  const [mood,setMood] = useState(null)
+  const [mood, setMood] = useState(null);
   const [selectedMood, setSelectedMood] = useState("all");
-
-  
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   return (
     <HomeContext.Provider
@@ -36,6 +36,12 @@ export const HomeProvider = ({ children }) => {
 
         selectedMood,
         setSelectedMood,
+
+        searchResults,
+        setSearchResults,
+
+        searchQuery,
+        setSearchQuery,
       }}
     >
       {children}

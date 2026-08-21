@@ -29,3 +29,8 @@ export async function songUpload(songFile) {
     throw error;
   }
 }
+
+export async function songSearch(query){
+  const responce =  await api.get(`/api/songs/search?q=${encodeURIComponent(query)}`)
+  return responce.data.songs
+}

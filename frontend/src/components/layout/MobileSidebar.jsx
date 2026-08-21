@@ -11,11 +11,6 @@ const MobileSidebar = ({ isOpen, onClose, onUploadClick, onMoodClick }) => {
       path: "/",
     },
     {
-      name: "Search",
-      icon: Search,
-      path: "/search",
-    },
-    {
       name: "Upload Song",
       icon: Upload,
       action: "upload",
@@ -25,11 +20,11 @@ const MobileSidebar = ({ isOpen, onClose, onUploadClick, onMoodClick }) => {
       icon: ScanFace,
       action: "mood",
     },
-    {
-      name: "Profile",
-      icon: User,
-      path: "/profile",
-    },
+    // {
+    //   name: "Profile",
+    //   icon: User,
+    //   path: "/profile",
+    // },
   ];
 
   const handleUploadClick = () => {
