@@ -2,6 +2,10 @@
 
 AuraTune is a full-stack music web application that lets users upload and play songs and uses music features/mood classification to organize songs by mood.
 
+## Live Link => https://auratune-vqd1.onrender.com/
+
+## GitHub Repo => https://github.com/tanveerahmed9413/auratune
+
 ## Tech Stack
 
 ### Frontend
