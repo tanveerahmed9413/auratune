@@ -1,313 +1,140 @@
-import { SkipBack, SkipForward, Pause, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { SkipBack, SkipForward, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { useHome } from "../../features/home/hook/useHome";
+import { getMoodMeta } from "../../constants/moods";
 
-// =========================
-// FORMAT TIME
-// =========================
-
-const formatTime = (time) => {
-  if (!time || isNaN(time)) {
-    return "0:00";
-  }
-
-  const minutes = Math.floor(time / 60);
-
-  const seconds = Math.floor(time % 60)
-    .toString()
-    .padStart(2, "0");
-
-  return `${minutes}:${seconds}`;
+const formatTime = (t) => {
+  if (!t || Number.isNaN(t)) return "0:00";
+  return `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 };
 
 const BottomPlayer = () => {
-  const { currentSong, nextSong, previousSong } = useHome();
-
+  const { currentSong, nextSong, previousSong, isPlaying, setIsPlaying } = useHome();
   const audioRef = useRef(null);
-
-  const [isPlaying, setIsPlaying] = useState(false);
-
+  const nextRef = useRef(nextSong);
   const [currentTime, setCurrentTime] = useState(0);
-
   const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(0.8);
+  const [muted, setMuted] = useState(false);
 
-  // =========================
-  // CURRENT SONG CHANGE
-  // =========================
+  // keep the latest nextSong for the "ended" listener without re-binding it
+  useEffect(() => { nextRef.current = nextSong; }, [nextSong]);
+
+  // The <audio> element is always mounted, so listeners are bound exactly once
+  useEffect(() => {
+    const audio = audioRef.current;
+    const onTime = () => setCurrentTime(audio.currentTime);
+    const onMeta = () => setDuration(audio.duration);
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    const onEnded = () => nextRef.current();
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("loadedmetadata", onMeta);
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("ended", onEnded);
+    return () => {
+      audio.removeEventListener("timeupdate", onTime);
+      audio.removeEventListener("loadedmetadata", onMeta);
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("ended", onEnded);
+    };
+  }, [setIsPlaying]);
 
   useEffect(() => {
-    if (!currentSong) return;
-
     const audio = audioRef.current;
-
-    if (!audio) return;
-
-    audio.pause();
-
-    audio.src = currentSong.songUrl;
-
-    audio.load();
-
+    if (!currentSong || !audio) return;
     setCurrentTime(0);
     setDuration(0);
-
-    // Song select hone ke baad autoplay
-    audio
-      .play()
-      .then(() => {
-        setIsPlaying(true);
-      })
-      .catch((error) => {
-        console.log("Autoplay blocked:", error);
-
-        setIsPlaying(false);
+    audio.src = currentSong.songUrl;
+    audio.play().catch(() => setIsPlaying(false)); // autoplay may be blocked
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentSong.title,
+        artist: "AuraTune",
+        artwork: [{ src: currentSong.posterUrl }],
       });
-  }, [currentSong]);
-
-  // =========================
-  // AUDIO EVENTS
-  // =========================
+    }
+  }, [currentSong, setIsPlaying]);
 
   useEffect(() => {
-    const audio = audioRef.current;
-
-    if (!audio) return;
-
-    const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-    };
-
-    const handleLoadedMetadata = () => {
-      setDuration(audio.duration);
-    };
-
-    const handleEnded = () => {
-      setIsPlaying(false);
-
-      // Automatically next song
-      nextSong();
-    };
-
-    audio.addEventListener("timeupdate", handleTimeUpdate);
-
-    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
-
-    audio.addEventListener("ended", handleEnded);
-
-    return () => {
-      audio.removeEventListener("timeupdate", handleTimeUpdate);
-
-      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
-
-      audio.removeEventListener("ended", handleEnded);
-    };
-  }, [nextSong]);
-
-  // =========================
-  // PLAY / PAUSE
-  // =========================
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+      audioRef.current.muted = muted;
+    }
+  }, [volume, muted]);
 
   const togglePlay = () => {
     const audio = audioRef.current;
-
     if (!audio || !currentSong) return;
-
-    if (audio.paused) {
-      audio.play().then(() => {
-        setIsPlaying(true);
-      });
-    } else {
-      audio.pause();
-
-      setIsPlaying(false);
-    }
+    if (audio.paused) audio.play().catch(() => {});
+    else audio.pause();
   };
 
-  // =========================
-  // NO SONG
-  // =========================
+  const seek = (e) => {
+    const t = Number(e.target.value);
+    audioRef.current.currentTime = t;
+    setCurrentTime(t);
+  };
 
-  if (!currentSong) {
-    return null;
-  }
+  const pct = duration ? (currentTime / duration) * 100 : 0;
+  const meta = currentSong ? getMoodMeta(currentSong.mood) : null;
 
   return (
-    <div className="fixed bottom-3 left-3 right-3 lg:left-[260px] z-50 rounded-2xl border border-violet-500/30 bg-[#0b101c]/95 backdrop-blur-xl shadow-[0_0_40px_rgba(79,70,229,0.12)] text-white">
-      {/* REAL AUDIO */}
+    <div className={currentSong ? "shrink-0 px-3 sm:px-6 lg:px-8 pb-3 pt-2" : "hidden"}>
+      <audio ref={audioRef} preload="metadata" />
 
-      <audio ref={audioRef} />
+      {currentSong && (
+        <div className="rounded-2xl border border-violet-500/25 bg-[#0b101c]/95 backdrop-blur-xl shadow-[0_0_40px_rgba(79,70,229,0.12)] px-4 py-3 lg:px-6">
+          <div className="flex items-center gap-4">
+            {/* Song info */}
+            <div className="flex items-center gap-3 min-w-0 flex-1 lg:flex-none lg:w-[28%]">
+              <img src={currentSong.posterUrl} alt="" className="w-12 h-12 lg:w-14 lg:h-14 rounded-xl object-cover shrink-0" />
+              <div className="min-w-0">
+                <h3 className="text-sm lg:text-base font-semibold truncate">{currentSong.title}</h3>
+                <p className={`text-xs capitalize truncate ${meta.text}`}>{currentSong.mood || "Unknown mood"}</p>
+              </div>
+            </div>
 
-      {/* ========================= */}
-      {/* DESKTOP */}
-      {/* ========================= */}
+            {/* Controls + (desktop) progress */}
+            <div className="flex flex-col items-center gap-2 lg:flex-1">
+              <div className="flex items-center gap-4 sm:gap-6">
+                <button onClick={previousSong} aria-label="Previous" className="cursor-pointer text-gray-300 hover:text-violet-300 transition">
+                  <SkipBack size={20} fill="currentColor" />
+                </button>
+                <button onClick={togglePlay} aria-label={isPlaying ? "Pause" : "Play"} className="w-11 h-11 cursor-pointer rounded-full flex items-center justify-center bg-violet-600 shadow-[0_0_28px_rgba(124,58,237,0.5)] hover:bg-violet-500 active:scale-95 transition">
+                  {isPlaying ? <Pause size={20} fill="white" /> : <Play size={20} fill="white" className="ml-0.5" />}
+                </button>
+                <button onClick={nextSong} aria-label="Next" className="cursor-pointer text-gray-300 hover:text-violet-300 transition">
+                  <SkipForward size={20} fill="currentColor" />
+                </button>
+              </div>
 
-      <div className="hidden lg:flex h-[100px] items-center gap-6 px-10">
-        {/* SONG INFO */}
+              <div className="hidden lg:flex items-center gap-3 w-full max-w-[560px]">
+                <span className="w-9 text-right text-xs text-gray-400 tabular-nums">{formatTime(currentTime)}</span>
+                <input type="range" className="seek flex-1" aria-label="Seek" min="0" max={duration || 0} step="0.1" value={currentTime} onChange={seek} style={{ "--p": `${pct}%` }} />
+                <span className="w-9 text-xs text-gray-400 tabular-nums">{formatTime(duration)}</span>
+              </div>
+            </div>
 
-        <div className="flex items-center gap-5 min-w-[300px]">
-          <img
-            src={currentSong.posterUrl}
-            alt={currentSong.title}
-            className="w-[60px] h-[60px] rounded-xl object-cover"
-          />
-
-          <div className="min-w-0">
-            <h3 className="text-[18px] font-semibold truncate">
-              {currentSong.title}
-            </h3>
-
-            <p className="text-gray-400 mt-1 capitalize">
-              {currentSong.mood || "Unknown mood"}
-            </p>
-          </div>
-        </div>
-
-        {/* CENTER */}
-
-        <div className="flex-1 flex flex-col items-center gap-5">
-          {/* CONTROLS */}
-
-          <div className="flex items-center gap-8">
-            {/* PREVIOUS */}
-
-            <button
-              onClick={previousSong}
-              className="text-white cursor-pointer hover:text-violet-400 transition"
-            >
-              <SkipBack size={22} fill="currentColor" />
-            </button>
-
-            {/* PLAY / PAUSE */}
-
-            <button
-              onClick={togglePlay}
-              className="w-[50px] h-[50px] cursor-pointer rounded-full flex items-center justify-center bg-violet-600 shadow-[0_0_30px_rgba(124,58,237,0.55)] hover:bg-violet-500 transition"
-            >
-              {isPlaying ? (
-                <Pause size={24} fill="white" />
-              ) : (
-                <Play size={24} fill="white" />
-              )}
-            </button>
-
-            {/* NEXT */}
-
-            <button
-              onClick={nextSong}
-              className="text-white cursor-pointer hover:text-violet-400 transition"
-            >
-              <SkipForward size={22} fill="currentColor" />
-            </button>
+            {/* Volume (desktop) */}
+            <div className="hidden lg:flex items-center gap-2 w-[16%] justify-end">
+              <button onClick={() => setMuted((m) => !m)} aria-label={muted ? "Unmute" : "Mute"} className="cursor-pointer text-gray-400 hover:text-white transition">
+                {muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
+              </button>
+              <input type="range" className="seek w-24" aria-label="Volume" min="0" max="1" step="0.01" value={muted ? 0 : volume} onChange={(e) => { setMuted(false); setVolume(Number(e.target.value)); }} style={{ "--p": `${(muted ? 0 : volume) * 100}%` }} />
+            </div>
           </div>
 
-          {/* PROGRESS */}
-
-          <div className="flex items-center gap-3 w-full max-w-[550px]">
-            <span className="text-xs text-gray-400">
-              {formatTime(currentTime)}
-            </span>
-
-            <input
-              type="range"
-              min="0"
-              max={duration || 0}
-              value={currentTime}
-              onChange={(e) => {
-                const time = Number(e.target.value);
-
-                audioRef.current.currentTime = time;
-
-                setCurrentTime(time);
-              }}
-              className="flex-1 accent-violet-500"
-            />
-
-            <span className="text-xs text-gray-400">
-              {formatTime(duration)}
-            </span>
+          {/* Mobile progress */}
+          <div className="lg:hidden mt-2.5 flex items-center gap-2">
+            <span className="w-8 text-[10px] text-gray-500 tabular-nums">{formatTime(currentTime)}</span>
+            <input type="range" className="seek flex-1" aria-label="Seek" min="0" max={duration || 0} step="0.1" value={currentTime} onChange={seek} style={{ "--p": `${pct}%` }} />
+            <span className="w-8 text-right text-[10px] text-gray-500 tabular-nums">{formatTime(duration)}</span>
           </div>
         </div>
-      </div>
-
-      {/* ========================= */}
-      {/* MOBILE / TABLET */}
-      {/* ========================= */}
-
-      <div className="lg:hidden px-4 py-3">
-        <div className="flex items-center gap-3">
-          {/* IMAGE */}
-
-          <img
-            src={currentSong.posterUrl}
-            alt={currentSong.title}
-            className="w-[52px] h-[52px] rounded-lg object-cover flex-shrink-0"
-          />
-
-          {/* INFO */}
-
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[14px] font-semibold truncate">
-              {currentSong.title}
-            </h3>
-
-            <p className="text-xs text-gray-400 mt-0.5 truncate capitalize">
-              {currentSong.mood || "Unknown mood"}
-            </p>
-          </div>
-
-          {/* PREVIOUS */}
-
-          <button onClick={previousSong} className="text-gray-300">
-            <SkipBack size={18} />
-          </button>
-
-          {/* PLAY */}
-
-          <button
-            onClick={togglePlay}
-            className="w-10 h-10 rounded-full flex items-center justify-center bg-violet-600"
-          >
-            {isPlaying ? (
-              <Pause size={18} fill="white" />
-            ) : (
-              <Play size={18} fill="white" />
-            )}
-          </button>
-
-          {/* NEXT */}
-
-          <button onClick={nextSong} className="text-gray-300">
-            <SkipForward size={18} />
-          </button>
-        </div>
-
-        {/* MOBILE PROGRESS */}
-
-        <div className="mt-3 flex items-center gap-2">
-          <span className="text-[10px] text-gray-500">
-            {formatTime(currentTime)}
-          </span>
-
-          <input
-            type="range"
-            min="0"
-            max={duration || 0}
-            value={currentTime}
-            onChange={(e) => {
-              const time = Number(e.target.value);
-
-              audioRef.current.currentTime = time;
-
-              setCurrentTime(time);
-            }}
-            className="flex-1 accent-violet-500"
-          />
-
-          <span className="text-[10px] text-gray-500">
-            {formatTime(duration)}
-          </span>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

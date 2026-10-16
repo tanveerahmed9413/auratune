@@ -4,9 +4,24 @@ const jwt = require("jsonwebtoken");
 const blackListModel = require("../models/blackList.model");
 const redis = require("../config/cache")
 
+// Cross-site cookies (separate frontend domain) need SameSite=None + Secure in production
+const isProd = process.env.NODE_ENV === "production";
+const cookieOptions = {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: isProd ? "none" : "lax",
+  maxAge: 3 * 24 * 60 * 60 * 1000,
+};
+
 async function registerUser(req, res) {
 
   const { username, email, password } = req.body;
+
+  if (!username || !email || !password || password.length < 6) {
+    return res.status(400).json({
+      message: "Username, email and a password of at least 6 characters are required",
+    });
+  }
 
   const isAlreadyExist = await userModel.findOne({
     $or: [{ username }, { email }],
@@ -35,7 +50,7 @@ async function registerUser(req, res) {
     { expiresIn: "3d" },
   );
 
-  res.cookie("token", token);
+  res.cookie("token", token, cookieOptions);
 
   return res.status(201).json({
     message: "user register successfully",
@@ -50,8 +65,12 @@ async function registerUser(req, res) {
 async function loginUser(req, res) {
   const { username, email, password } = req.body;
 
+  if (!password || (!username && !email)) {
+    return res.status(400).json({ message: "Email and password are required" });
+  }
+
   const user = await userModel.findOne({
-    $or: [{ username }, { email }],
+    $or: [username && { username }, email && { email }].filter(Boolean),
   }).select("+password");
 
   if (!user) {
@@ -77,9 +96,9 @@ async function loginUser(req, res) {
     { expiresIn: "3d" },
   );
 
-  res.cookie("token",token)
+  res.cookie("token", token, cookieOptions)
 
-  return res.status(201).json({
+  return res.status(200).json({
     message: "user login successfully",
     token,
     user: {
@@ -100,13 +119,12 @@ async function getMe(req,res){
 }
 
 async function logoutUser(req,res){
-  let token = req.cookies.token
+  const token = req.cookies.token
 
-  res.clearCookie('token')
+  res.clearCookie('token', { httpOnly: true, secure: isProd, sameSite: isProd ? "none" : "lax" })
 
-
-  
-   await redis.set(token,Date.now().toString(),"EX", 60*60)
+  // Blacklist for the token's remaining lifetime (3 days)
+  if (token) await redis.set(token, Date.now().toString(), "EX", 3 * 24 * 60 * 60)
 
   return res.status(200).json({
     message: "Logout Successfully"

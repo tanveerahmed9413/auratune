@@ -1,94 +1,68 @@
-import { Home, Smile } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Home, LogOut } from "lucide-react";
+import { NavLink } from "react-router-dom";
+import Logo from "../ui/Logo";
+import { useHome } from "../../features/home/hook/useHome";
+import { useAuth } from "../../features/auth/hooks/useAuth";
+import { getMoodMeta } from "../../constants/moods";
+
+export const MoodCard = () => {
+  const { detected } = useHome();
+  const expression = detected?.expression;
+  const meta = expression ? getMoodMeta(expression) : null;
+
+  return (
+    <div className="relative rounded-2xl border border-white/[0.08] bg-gradient-to-br from-[#111622] to-[#0b0f18] p-5 overflow-hidden">
+      {meta && <div className={`pointer-events-none absolute -top-10 -right-10 w-32 h-32 rounded-full bg-gradient-to-br ${meta.glow} to-transparent blur-2xl`} />}
+      <p className="relative text-[13px] text-gray-400 mb-3">Current mood</p>
+      <div className="relative flex items-center gap-3">
+        <div className="w-11 h-11 rounded-full bg-violet-500/90 flex items-center justify-center shadow-[0_0_25px_rgba(139,92,246,0.35)]">
+          {meta ? <meta.icon size={26} strokeWidth={1.8} className="text-white" /> : <span className="text-lg">?</span>}
+        </div>
+        <span className="text-white text-[17px] font-medium whitespace-nowrap">{meta ? meta.label : "Not scanned"}</span>
+      </div>
+      <p className="relative text-gray-400 text-[13px] mt-3">
+        {meta ? meta.tagline : "Scan your face to get songs that fit."}
+      </p>
+    </div>
+  );
+};
 
 const Sidebar = () => {
+  const { user, handleLogout } = useAuth();
+
   return (
-    <aside
-      className="
-        w-[245px] min-h-screen
-        bg-[#080c14]
-        border-r border-white/[0.08]
-        flex flex-col
-        px-7 py-8
-      "
-    >
-      {/* Logo */}
-      <div className="flex items-center gap-3 mb-12">
-        {/* Moodify Logo */}
-        <div className="relative w-10 h-10 flex items-center justify-center">
-          <div className="absolute w-1 h-5 bg-violet-500 rounded-full left-1" />
-          <div className="absolute w-1 h-8 bg-violet-500 rounded-full left-3" />
-          <div className="absolute w-1 h-10 bg-violet-400 rounded-full left-5" />
-          <div className="absolute w-1 h-6 bg-violet-500 rounded-full left-7" />
-          <div className="absolute w-1 h-4 bg-violet-400 rounded-full left-9" />
-        </div>
+    <aside className="hidden lg:flex w-[245px] shrink-0 h-full flex-col bg-ink border-r border-white/[0.08] px-6 py-7">
+      <div className="mb-10"><Logo /></div>
 
-        <h1 className="text-[24px] font-semibold text-white tracking-tight">
-          Moodify
-        </h1>
-      </div>
-
-      {/* Navigation */}
-      <nav>
-        <Link to="/">
-          <div
-            className="
-            flex items-center gap-4
-            h-[54px]
-            px-4
-            rounded-xl
-            bg-gradient-to-r from-violet-700/80 to-violet-900/60
-            border border-violet-500/20
-            shadow-[0_8px_30px_rgba(109,40,217,0.18)]
-            text-violet-200 cursor-pointer
-          "
-          >
-            <Home size={22} strokeWidth={1.8} className="text-violet-200" />
-
-            <span className="text-[16px] font-medium">Home</span>
-          </div>
-        </Link>
+      <nav aria-label="Main">
+        <NavLink
+          to="/"
+          end
+          className={({ isActive }) =>
+            `flex items-center gap-3 h-12 px-4 rounded-xl border transition ${
+              isActive
+                ? "bg-gradient-to-r from-violet-700/80 to-violet-900/60 border-violet-500/20 text-violet-100 shadow-[0_8px_30px_rgba(109,40,217,0.18)]"
+                : "border-transparent text-gray-400 hover:text-white hover:bg-white/[0.04]"
+            }`
+          }
+        >
+          <Home size={20} strokeWidth={1.8} />
+          <span className="font-medium">Home</span>
+        </NavLink>
       </nav>
 
-      {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Current Mood */}
-      <div
-        className="
-          relative
-          rounded-2xl
-          border border-white/[0.08]
-          bg-gradient-to-br from-[#111622] to-[#0b0f18]
-          px-5 pt-5 pb-4
-          overflow-hidden
-        "
-      >
-        {/* Heading */}
-        <p className="text-white text-[14px] font-medium mb-5">Current Mood</p>
+      <MoodCard />
 
-        {/* Mood */}
-        <div className="flex items-center gap-3">
-          {/* Happy Icon */}
-          <div
-            className="
-              w-11 h-11
-              rounded-full
-              bg-violet-500
-              flex items-center justify-center
-              shadow-[0_0_25px_rgba(139,92,246,0.35)]
-            "
-          >
-            <Smile size={27} strokeWidth={1.8} className="text-white" />
-          </div>
-
-          <span className="text-white text-[19px] font-medium">Happy</span>
+      <div className="mt-4 flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+        <div className="w-8 h-8 shrink-0 rounded-full bg-violet-600/30 border border-violet-500/30 flex items-center justify-center text-sm font-semibold uppercase">
+          {user?.username?.[0] || "U"}
         </div>
-
-        {/* Description */}
-        <p className="text-gray-400 text-[13px] mt-3">
-          Let's keep the good vibes!
-        </p>
+        <p className="flex-1 min-w-0 truncate text-sm text-gray-200">{user?.username}</p>
+        <button type="button" onClick={handleLogout} aria-label="Log out" title="Log out" className="cursor-pointer text-gray-500 hover:text-white transition">
+          <LogOut size={17} />
+        </button>
       </div>
     </aside>
   );

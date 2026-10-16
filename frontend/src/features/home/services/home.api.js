@@ -1,36 +1,16 @@
-import axios from "axios";
+import api from "../../../lib/api";
 
-const api = axios.create({
-  baseURL: "https://auratune-vqd1.onrender.com",
-  withCredentials: true,
-});
+export const getAllSongs = async () => (await api.get("/api/songs")).data.songs;
 
-export async function getAllSongs() {
-  const response = await api.get("/api/songs");
-  return response.data.songs;
-}
-
-export const getSongsByMood = async (mood) => {
-  const response = await api.get(`/api/songs/mood/${mood}`);
-  console.log(response.data.songs);
-  return response.data.songs;
+// `moods` can be one mood or a list; the backend accepts a comma separated list
+export const getSongsByMood = async (moods) => {
+  const list = Array.isArray(moods) ? moods.join(",") : moods;
+  return (await api.get(`/api/songs/mood/${encodeURIComponent(list)}`)).data.songs;
 };
 
-export async function songUpload(songFile) {
-  try {
-    const formData = new FormData();
-    formData.append("song", songFile);
-    const response = await api.post("/api/songs/upload", formData);
-
-    return response.data;
-  } catch (error) {
-    console.error("UPLOAD ERROR:", error.message);
-
-    throw error;
-  }
-}
-
-export async function songSearch(query){
-  const responce =  await api.get(`/api/songs/search?q=${encodeURIComponent(query)}`)
-  return responce.data.songs
-}
+export const songUpload = async (songFile, mood) => {
+  const formData = new FormData();
+  formData.append("song", songFile);
+  if (mood && mood !== "auto") formData.append("mood", mood);
+  return (await api.post("/api/songs/upload", formData)).data;
+};

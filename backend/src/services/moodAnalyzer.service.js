@@ -125,7 +125,7 @@ const analyzeAudio = async (audioBuffer, fileName) => {
         headers,
         maxBodyLength: Infinity,
         maxContentLength: Infinity,
-        timeout: 180000,
+        timeout: 60000,
       },
     );
 
@@ -138,9 +138,7 @@ const analyzeAudio = async (audioBuffer, fileName) => {
       features,
     };
   } catch (error) {
-    console.error("Message:", error.message);
-
-    throw new Error("Audio analysis failed");
+    throw new Error(`Audio analysis failed: ${error.message}`);
   }
 };
 

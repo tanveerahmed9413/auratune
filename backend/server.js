@@ -1,13 +1,13 @@
-
 require("dotenv").config();
 
-let app = require("./src/app");
-let connectToDb = require("./src/config/database");
+const app = require("./src/app");
+const connectToDb = require("./src/config/database");
 
-let port = 3000;
+// Render (and most hosts) inject PORT; fall back to 3000 locally
+const port = process.env.PORT || 3000;
 
 connectToDb();
 
 app.listen(port, () => {
-    console.log(`Server is running at http://localhost:${port}`);
+  console.log(`Server is running on port ${port}`);
 });

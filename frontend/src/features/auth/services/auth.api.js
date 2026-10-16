@@ -1,28 +1,11 @@
-import axios from "axios"
+import api from "../../../lib/api";
 
-let api = axios.create({
-    baseURL: "https://auratune-vqd1.onrender.com",
-    withCredentials: true
-})
+export const register = async ({ email, username, password }) =>
+  (await api.post("/api/auth/register", { email, username, password })).data;
 
+export const login = async ({ email, username, password }) =>
+  (await api.post("/api/auth/login", { email, username, password })).data;
 
-export async function register({email,username,password}){
-    let response = await api.post('/api/auth/register',{
-        email,username,password
-    })
-    return response.data
-}
-export async function login({email,username,password}){
-    let response = await api.post('/api/auth/login',{
-        email,username,password
-    })
-    return response.data
-}
-export async function getMe(){
-    let response = await api.get("/api/auth/get-me")
-    return response.data
-}
-export async function logout(){
-    let response = await api.get('/api/auth/logout')
-    return response.data
-}
+export const getMe = async () => (await api.get("/api/auth/get-me")).data;
+
+export const logout = async () => (await api.get("/api/auth/logout")).data;

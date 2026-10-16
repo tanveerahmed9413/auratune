@@ -1,41 +1,31 @@
-import React from "react";
+import { MOODS, getMoodMeta } from "../../../constants/moods";
 
-const moods = [
-  "all",
-  "sad",
-  "happy",
-  "energetic",
-  "angry",
-  "calm",
-  "surprised",
-  "neutral",
-];
-
-const MoodFilter = ({ selectedMood = "all", onMoodChange }) => {
-  return (
-    <div className="w-full min-w-0 flex flex-row overflow-x-auto scrollbar-none">
-      <div className="flex flex-row gap-2">
-        {moods.map((mood) => {
-          const isActive = selectedMood === mood;
-
-          return (
-            <button
-              key={mood}
-              type="button"
-              onClick={() => onMoodChange(mood)}
-              className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium capitalize transition-all cursor-pointer ${
-                isActive
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-                  : "bg-white/[0.05] text-gray-400 border border-white/[0.08] hover:bg-blue-500/10 hover:text-white"
-              }`}
-            >
-              {mood}
-            </button>
-          );
-        })}
-      </div>
+const MoodFilter = ({ selectedMood = "all", onMoodChange }) => (
+  <div className="w-full min-w-0 overflow-x-auto scrollbar-none" role="tablist" aria-label="Filter songs by mood">
+    <div className="flex flex-row sm:flex-wrap gap-2 pr-2">
+      {MOODS.map((mood) => {
+        const active = selectedMood === mood;
+        const Icon = mood === "all" ? null : getMoodMeta(mood).icon;
+        return (
+          <button
+            key={mood}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onMoodChange(mood)}
+            className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 px-4 h-9 rounded-full text-sm font-medium capitalize transition-all cursor-pointer border ${
+              active
+                ? "bg-violet-600 border-violet-500 text-white shadow-lg shadow-violet-600/25"
+                : "bg-white/[0.04] border-white/[0.08] text-gray-400 hover:bg-violet-500/10 hover:text-white"
+            }`}
+          >
+            {Icon && <Icon size={14} />}
+            {mood}
+          </button>
+        );
+      })}
     </div>
-  );
-};
+  </div>
+);
 
 export default MoodFilter;

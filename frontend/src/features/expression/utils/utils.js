@@ -1,79 +1,95 @@
-import {
-  FilesetResolver,
-  FaceLandmarker,
-  FaceDetector,
-} from "@mediapipe/tasks-vision";
+import { FilesetResolver, FaceLandmarker } from "@mediapipe/tasks-vision";
+import { aggregate, classify, scoreExpressions, toScoreMap } from "./expression";
 
-export const init = async ({ landmarkerRef, videoRef, streamRef }) => {
-  const vision = await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm",
-  );
-  landmarkerRef.current = await FaceLandmarker.createFromOptions(vision, {
-    baseOptions: {
-      modelAssetPath:
-        "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-    },
-    outputFaceBlendshapes: true,
-    runningMode: "VIDEO",
-    numFaces: 1,
-  });
-  streamRef = await navigator.mediaDevices.getUserMedia({ video: true });
-  videoRef.current.srcObject = streamRef;
-  await videoRef.current.play();
-  // detect();
-};
-export const detect = ({
-  landmarkerRef,
-  videoRef,
-  setExpression,
-  onMoodDetected,
-}) => {
-  if (!landmarkerRef.current || !videoRef.current) return;
+const MODEL_URL =
+  "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 
-  const results = landmarkerRef.current.detectForVideo(
-    videoRef.current,
-    performance.now(),
-  );
+// wasm is copied from node_modules into /public by scripts/copy-wasm.mjs
+const WASM_URL = `${import.meta.env.BASE_URL}mediapipe/wasm`;
 
-  if (results.faceBlendshapes?.length > 0) {
-    const blendshapes = results.faceBlendshapes[0].categories;
-    const getScore = (name) =>
-      blendshapes.find((b) => b.categoryName === name)?.score || 0;
+let landmarkerPromise = null;
 
-    const smileLeft = getScore("mouthSmileLeft");
-    const smileRight = getScore("mouthSmileRight");
-
-    const jawOpen = getScore("jawOpen");
-    const browUp = getScore("browInnerUp");
-
-    const frownLeft = getScore("mouthFrownLeft");
-    const frownRight = getScore("mouthFrownRight");
-
-    const browDownLeft = getScore("browDownLeft");
-    const browDownRight = getScore("browDownRight");
-
-    const smile = (smileLeft + smileRight) / 2;
-    const frown = (frownLeft + frownRight) / 2;
-    const browDown = (browDownLeft + browDownRight) / 2;
-
-    let currentExpression = "neutral";
-    let mood = "neutral";
-
-    if (jawOpen > 0.2 && browUp > 0.2) {
-      currentExpression = "surprised";
-      mood = "surprised";
-    } else if (frown > 0.15 || browDown > 0.15) {
-      currentExpression = "sad";
-      mood = "sad";
-    } else if (smile > 0.3) {
-      currentExpression = "happy";
-      mood = "happy";
-    }
-
-    console.log({ smile, frown, browDown, jawOpen, browUp });
-    setExpression(currentExpression);
-    if (onMoodDetected) {
-      onMoodDetected(mood);
-    }
+/** Load the model once and share it (survives StrictMode double-mount). */
+export const loadLandmarker = () => {
+  if (!landmarkerPromise) {
+    landmarkerPromise = (async () => {
+      const vision = await FilesetResolver.forVisionTasks(WASM_URL);
+      const make = (delegate) =>
+        FaceLandmarker.createFromOptions(vision, {
+          baseOptions: { modelAssetPath: MODEL_URL, delegate },
+          outputFaceBlendshapes: true,
+          runningMode: "VIDEO",
+          numFaces: 1,
+        });
+      try {
+        return await make("GPU");
+      } catch {
+        return await make("CPU");
+      }
+    })().catch((err) => {
+      landmarkerPromise = null; // allow retry
+      throw err;
+    });
   }
+  return landmarkerPromise;
+};
+
+export const startCamera = async (videoEl) => {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("Camera is not supported in this browser (HTTPS required).");
+  }
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+    audio: false,
+  });
+  videoEl.srcObject = stream;
+  await videoEl.play();
+  return stream;
+};
+
+export const stopCamera = (stream, videoEl) => {
+  stream?.getTracks().forEach((t) => t.stop());
+  if (videoEl) videoEl.srcObject = null;
+};
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Scan the face for `durationMs`, sampling many frames, then classify the
+ * averaged result. A single frame is noisy (blinks, mid-motion), many are not.
+ */
+export const scanExpression = async ({
+  landmarker,
+  video,
+  durationMs = 2500,
+  onProgress,
+  signal,
+}) => {
+  const frames = [];
+  let missed = 0;
+  let lastVideoTime = -1;
+  const start = performance.now();
+
+  while (performance.now() - start < durationMs) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    onProgress?.(Math.min((performance.now() - start) / durationMs, 1));
+
+    if (video.readyState >= 2 && video.videoWidth > 0 && video.currentTime !== lastVideoTime) {
+      lastVideoTime = video.currentTime;
+      const res = landmarker.detectForVideo(video, performance.now());
+      const categories = res.faceBlendshapes?.[0]?.categories;
+      if (categories?.length) frames.push(scoreExpressions(toScoreMap(categories)));
+      else missed++;
+    }
+    await wait(60);
+  }
+  onProgress?.(1);
+
+  if (frames.length < 5) {
+    return { ok: false, reason: "no-face", frames: frames.length, missed };
+  }
+
+  const scores = aggregate(frames);
+  const { expression, confidence } = classify(scores);
+  return { ok: true, expression, confidence, scores, frames: frames.length };
 };

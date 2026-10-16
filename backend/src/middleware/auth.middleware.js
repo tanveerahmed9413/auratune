@@ -1,43 +1,22 @@
+const jwt = require("jsonwebtoken");
+const redis = require("../config/cache");
 
+async function authUser(req, res, next) {
+  const token = req.cookies.token;
 
-const jwt = require("jsonwebtoken")
-const cookie = require("cookie-parser")
-const blackListModel = require("../models/blackList.model")
-const redis = require("../config/cache")
+  if (!token) {
+    return res.status(401).json({ message: "Please log in to continue" });
+  }
 
-async function authUser(req,res,next){
-    // console.log("Cookies:", req.cookies);
-
-    const token = req.cookies.token;
-
-    // console.log("Token:", token);
-
-    if(!token){
-        return res.status(401).json({
-            message: 'Token Not Provide'
-        })
+  try {
+    if (await redis.get(token)) {
+      return res.status(401).json({ message: "Session expired, please log in again" });
     }
-
-    let isTokenBlacklisted = await redis.get(token)
-
-    if(isTokenBlacklisted){
-        return res.status(200).json({
-            message: 'invalid token'
-        })
-    }
-
-    try{
-        let decoded = jwt.verify(token,process.env.JWT_SECRET)
-    
-        req.user = decoded
-        next()
-
-    }catch(err){
-        return res.status(401).json({
-            message: "invalid token"
-        })
-    }
-
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch (err) {
+    return res.status(401).json({ message: "Invalid or expired session" });
+  }
 }
 
-module.exports = authUser
+module.exports = authUser;
